@@ -19,8 +19,39 @@ function createTask(title) {
     return getTaskById(result.lastInsertRowid);
 }
 
+// Update a task, return the updated row or null if not found
+function updateTask(id, title, done) {
+    const stmt = db.prepare(`
+        UPDATE tasks
+        SET title = ?, done = ?
+        WHERE id = ?
+    `);
+
+    const result = stmt.run(title, done, id);
+
+    if (result.changes === 0) {
+        return null;
+    }
+
+    return getTaskById(id);
+}
+
+// Delete a task, return true if deleted, false if not found
+function deleteTask(id) {
+    const stmt = db.prepare(`
+        DELETE FROM tasks
+        WHERE id = ?
+    `);
+
+    const result = stmt.run(id);
+
+    return result.changes > 0;
+}
+
 module.exports = {
     getAllTasks,
     getTaskById,
     createTask,
+    updateTask,
+    deleteTask,
 };
