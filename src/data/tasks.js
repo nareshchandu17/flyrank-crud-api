@@ -1,4 +1,4 @@
-const tasks = [
+const initialTasks = [
   {
     id: 1,
     title: "Learn Express",
@@ -16,4 +16,9 @@ const tasks = [
   }
 ];
 
-module.exports = tasks;
+const tasks = [...initialTasks];
+
+module.exports = {
+    tasks,
+    initialTasks
+};

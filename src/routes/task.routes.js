@@ -7,7 +7,9 @@ const {
   getTaskById,
   createTask,
   updateTask,
-  deleteTask
+  deleteTask,
+  getStats,
+  resetTasks
 } = require("../controllers/task.controller");
 
 /**
@@ -98,5 +100,29 @@ router.put("/:id", updateTask);
  *         description: Deleted
  */
 router.delete("/:id", deleteTask);
+
+/**
+ * @swagger
+ * /tasks/stats:
+ *   get:
+ *     summary: Get task statistics
+ *     tags: [Tasks]
+ *     responses:
+ *       200:
+ *         description: Task statistics
+ */
+router.get("/stats", getStats);
+
+/**
+ * @swagger
+ * /tasks/reset:
+ *   post:
+ *     summary: Reset tasks to initial state
+ *     tags: [Tasks]
+ *     responses:
+ *       200:
+ *         description: Tasks reset successfully
+ */
+router.post("/reset", resetTasks);
 
 module.exports = router;

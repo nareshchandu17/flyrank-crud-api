@@ -1,4 +1,4 @@
-const tasks = require("../data/tasks");
+const { tasks, initialTasks } = require("../data/tasks");
 
 const getNextId = () => {
     if (tasks.length === 0) return 1;
@@ -6,7 +6,24 @@ const getNextId = () => {
 };
 
 const getAllTasks = (req, res) => {
-  res.status(200).json(tasks);
+    let result = [...tasks];
+
+    const { done, search } = req.query;
+
+    // Filter by done status
+    if (done !== undefined) {
+        const isDone = done === "true";
+        result = result.filter(task => task.done === isDone);
+    }
+
+    // Search by title
+    if (search) {
+        result = result.filter(task =>
+            task.title.toLowerCase().includes(search.toLowerCase())
+        );
+    }
+
+    res.status(200).json(result);
 };
 
 const getTaskById = (req, res) => {
@@ -102,10 +119,34 @@ const deleteTask = (req, res) => {
     res.sendStatus(204);
 };
 
+const getStats = (req, res) => {
+    const total = tasks.length;
+    const done = tasks.filter(task => task.done).length;
+    const open = total - done;
+
+    res.json({
+        total,
+        done,
+        open
+    });
+};
+
+const resetTasks = (req, res) => {
+    tasks.length = 0;
+    initialTasks.forEach(task => tasks.push({ ...task }));
+
+    res.json({
+        message: "Tasks reset successfully",
+        tasks
+    });
+};
+
 module.exports = {
   getAllTasks,
   getTaskById,
   createTask,
   updateTask,
-  deleteTask
+  deleteTask,
+  getStats,
+  resetTasks
 };
