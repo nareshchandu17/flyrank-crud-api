@@ -1,6 +1,8 @@
 const express = require("express");
+const swaggerUi = require("swagger-ui-express");
 
 const taskRoutes = require("./routes/task.routes");
+const swaggerSpec = require("./swagger/swagger");
 
 const app = express();
 
@@ -21,5 +23,11 @@ app.get("/health", (req, res) => {
 });
 
 app.use("/tasks", taskRoutes);
+
+app.use(
+    "/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec)
+);
 
 module.exports = app;
