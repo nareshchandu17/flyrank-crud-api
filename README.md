@@ -51,7 +51,7 @@ Visit:
 
 http://localhost:3000/docs
 
-![Swagger UI Screenshot](swagger-screenshot.png)
+![Swagger UI Screenshot](assets/swagger-ui.png)
 
 ## Sample curl Command
 
