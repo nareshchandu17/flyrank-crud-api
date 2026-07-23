@@ -12,7 +12,15 @@ function getTaskById(id) {
     return stmt.get(id);
 }
 
+// Insert a new task, return the full created row
+function createTask(title) {
+    const stmt = db.prepare("INSERT INTO tasks (title, done) VALUES (?, 0)");
+    const result = stmt.run(title);
+    return getTaskById(result.lastInsertRowid);
+}
+
 module.exports = {
     getAllTasks,
     getTaskById,
+    createTask,
 };

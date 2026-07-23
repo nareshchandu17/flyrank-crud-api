@@ -35,13 +35,7 @@ const createTask = (req, res) => {
         });
     }
 
-    const newTask = {
-        id: getNextId(),
-        title: title.trim(),
-        done: false
-    };
-
-    tasks.push(newTask);
+    const newTask = taskModel.createTask(title.trim());
 
     res.status(201).json(newTask);
 };
