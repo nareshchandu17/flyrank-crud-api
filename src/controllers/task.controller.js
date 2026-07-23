@@ -1,4 +1,5 @@
 const { tasks, initialTasks } = require("../data/tasks");
+const taskModel = require("../models/task.model");
 
 const getNextId = () => {
     if (tasks.length === 0) return 1;
@@ -6,38 +7,22 @@ const getNextId = () => {
 };
 
 const getAllTasks = (req, res) => {
-    let result = [...tasks];
-
-    const { done, search } = req.query;
-
-    // Filter by done status
-    if (done !== undefined) {
-        const isDone = done === "true";
-        result = result.filter(task => task.done === isDone);
-    }
-
-    // Search by title
-    if (search) {
-        result = result.filter(task =>
-            task.title.toLowerCase().includes(search.toLowerCase())
-        );
-    }
-
-    res.status(200).json(result);
+    const tasks = taskModel.getAllTasks();
+    res.status(200).json(tasks);
 };
 
 const getTaskById = (req, res) => {
-  const id = Number(req.params.id);
+    const id = parseInt(req.params.id);
 
-  const task = tasks.find(task => task.id === id);
+    const task = taskModel.getTaskById(id);
 
-  if (!task) {
-    return res.status(404).json({
-      error: `Task ${id} not found`
-    });
-  }
+    if (!task) {
+        return res.status(404).json({
+            error: "Task not found",
+        });
+    }
 
-  res.status(200).json(task);
+    res.status(200).json(task);
 };
 
 const createTask = (req, res) => {
