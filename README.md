@@ -2,6 +2,13 @@
 
 A simple REST API built with Node.js and Express for the FlyRank Backend Internship.
 
+## Tech Stack
+
+- Node.js
+- Express.js
+- Swagger UI
+- JavaScript
+
 ## Features
 
 - Create Task
@@ -43,6 +50,16 @@ npm run dev
 Visit:
 
 http://localhost:3000/docs
+
+![Swagger UI Screenshot](swagger-screenshot.png)
+
+## Sample curl Command
+
+```bash
+curl -X POST http://localhost:3000/tasks \
+-H "Content-Type: application/json" \
+-d '{"title":"Buy milk"}'
+```
 
 ## Memory Storage Observation
 

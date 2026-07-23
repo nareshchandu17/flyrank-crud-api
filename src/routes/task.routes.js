@@ -47,6 +47,30 @@ router.post("/", createTask);
 
 /**
  * @swagger
+ * /tasks/stats:
+ *   get:
+ *     summary: Get task statistics
+ *     tags: [Tasks]
+ *     responses:
+ *       200:
+ *         description: Task statistics
+ */
+router.get("/stats", getStats);
+
+/**
+ * @swagger
+ * /tasks/reset:
+ *   post:
+ *     summary: Reset tasks to initial state
+ *     tags: [Tasks]
+ *     responses:
+ *       200:
+ *         description: Tasks reset successfully
+ */
+router.post("/reset", resetTasks);
+
+/**
+ * @swagger
  * /tasks/{id}:
  *   get:
  *     summary: Get task by ID
@@ -100,29 +124,5 @@ router.put("/:id", updateTask);
  *         description: Deleted
  */
 router.delete("/:id", deleteTask);
-
-/**
- * @swagger
- * /tasks/stats:
- *   get:
- *     summary: Get task statistics
- *     tags: [Tasks]
- *     responses:
- *       200:
- *         description: Task statistics
- */
-router.get("/stats", getStats);
-
-/**
- * @swagger
- * /tasks/reset:
- *   post:
- *     summary: Reset tasks to initial state
- *     tags: [Tasks]
- *     responses:
- *       200:
- *         description: Tasks reset successfully
- */
-router.post("/reset", resetTasks);
 
 module.exports = router;
