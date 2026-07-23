@@ -1,6 +1,8 @@
 const express = require("express");
 const swaggerUi = require("swagger-ui-express");
 
+require("./database/db");
+
 const taskRoutes = require("./routes/task.routes");
 const swaggerSpec = require("./swagger/swagger");
 
