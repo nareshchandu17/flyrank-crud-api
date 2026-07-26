@@ -6,6 +6,7 @@ A simple REST API built with Node.js and Express for the FlyRank Backend Interns
 
 - Node.js
 - Express.js
+- SQLite (via better-sqlite3)
 - Swagger UI
 - JavaScript
 
@@ -30,6 +31,44 @@ cd flyrank-crud-api
 npm install
 npm run dev
 ```
+
+The database file `tasks.db` is created automatically on first run. No manual setup required.
+
+## Why SQLite?
+
+- Lightweight, file-based database
+- No separate database server required
+- Zero configuration
+- Data persists even after server restarts
+- Perfect for small backend applications and learning SQL
+
+## Database
+
+The application uses a SQLite database named `tasks.db`.
+
+The database file is created automatically when the server starts.
+
+If the database is empty, three sample tasks are seeded automatically:
+
+| id | title | done |
+|----|-------|------|
+| 1 | Learn Express | 0 |
+| 2 | Complete FlyRank Assignment | 0 |
+| 3 | Push project to GitHub | 1 |
+
+## Example SQL Query
+
+```sql
+SELECT * FROM tasks;
+```
+
+Returns every task stored in the SQLite database.
+
+## Database Screenshot
+
+![SQLite Database](./assets/database.png)
+
+> **Note:** Screenshot taken from DB Browser for SQLite showing the `tasks` table with seeded data.
 
 ## API Endpoints
 
@@ -61,11 +100,12 @@ curl -X POST http://localhost:3000/tasks \
 -d '{"title":"Buy milk"}'
 ```
 
-## Memory Storage Observation
+## Storage
 
-This API stores all tasks in memory using a JavaScript array.
+This API uses SQLite via `better-sqlite3` for persistent storage.
 
-When the server restarts, all newly created or updated tasks are lost because the data is not persisted to a database. This demonstrates why databases are essential for storing application data permanently.
+All tasks survive server restarts because they are written to `tasks.db` on disk.
+This replaces the in-memory JavaScript array used in Assessment 1.
 
 ---
 
