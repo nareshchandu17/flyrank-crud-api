@@ -1,14 +1,14 @@
 const taskModel = require("../models/task.model");
 
-const getAllTasks = (req, res) => {
-    const tasks = taskModel.getAllTasks();
+const getAllTasks = async (req, res) => {
+    const tasks = await taskModel.getAllTasks();
     res.status(200).json(tasks);
 };
 
-const getTaskById = (req, res) => {
+const getTaskById = async (req, res) => {
     const id = parseInt(req.params.id);
 
-    const task = taskModel.getTaskById(id);
+    const task = await taskModel.getTaskById(id);
 
     if (!task) {
         return res.status(404).json({
@@ -19,22 +19,21 @@ const getTaskById = (req, res) => {
     res.status(200).json(task);
 };
 
-const createTask = (req, res) => {
+const createTask = async (req, res) => {
     const { title } = req.body;
 
-    // Validation
     if (!title || title.trim() === "") {
         return res.status(400).json({
-            error: "Title is required"
+            error: "Title is required",
         });
     }
 
-    const newTask = taskModel.createTask(title.trim());
+    const newTask = await taskModel.createTask(title.trim());
 
     res.status(201).json(newTask);
 };
 
-const updateTask = (req, res) => {
+const updateTask = async (req, res) => {
     const id = parseInt(req.params.id);
     const { title, done } = req.body;
 
@@ -56,7 +55,7 @@ const updateTask = (req, res) => {
         });
     }
 
-    const existingTask = taskModel.getTaskById(id);
+    const existingTask = await taskModel.getTaskById(id);
 
     if (!existingTask) {
         return res.status(404).json({
@@ -64,7 +63,7 @@ const updateTask = (req, res) => {
         });
     }
 
-    const updatedTask = taskModel.updateTask(
+    const updatedTask = await taskModel.updateTask(
         id,
         title ?? existingTask.title,
         done ?? existingTask.done
@@ -73,10 +72,10 @@ const updateTask = (req, res) => {
     res.status(200).json(updatedTask);
 };
 
-const deleteTask = (req, res) => {
+const deleteTask = async (req, res) => {
     const id = parseInt(req.params.id);
 
-    const deleted = taskModel.deleteTask(id);
+    const deleted = await taskModel.deleteTask(id);
 
     if (!deleted) {
         return res.status(404).json({
@@ -87,31 +86,27 @@ const deleteTask = (req, res) => {
     res.status(204).send();
 };
 
-const getStats = (req, res) => {
-    const allTasks = taskModel.getAllTasks();
+const getStats = async (req, res) => {
+    const allTasks = await taskModel.getAllTasks();
     const total = allTasks.length;
     const done = allTasks.filter(task => task.done).length;
     const open = total - done;
 
-    res.json({
-        total,
-        done,
-        open
-    });
+    res.json({ total, done, open });
 };
 
 const resetTasks = (req, res) => {
     res.status(501).json({
-        error: "Reset not supported with database storage"
+        error: "Reset not supported with database storage",
     });
 };
 
 module.exports = {
-  getAllTasks,
-  getTaskById,
-  createTask,
-  updateTask,
-  deleteTask,
-  getStats,
-  resetTasks
+    getAllTasks,
+    getTaskById,
+    createTask,
+    updateTask,
+    deleteTask,
+    getStats,
+    resetTasks,
 };

@@ -1,31 +1,40 @@
-const Database = require("better-sqlite3");
+require("dotenv").config();
+const { Pool } = require("pg");
 
-// Open (or create) the database file
-const db = new Database("tasks.db");
+// Create a connection pool using environment variables
+const pool = new Pool({
+    host:     process.env.PGHOST,
+    port:     process.env.PGPORT,
+    user:     process.env.PGUSER,
+    password: process.env.PGPASSWORD,
+    database: process.env.PGDATABASE,
+});
 
-// Create the tasks table if it doesn't exist
-db.prepare(`
-    CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        done INTEGER NOT NULL
-    )
-`).run();
+// Create table and seed initial data if empty
+async function initDb() {
+    // Create the tasks table if it doesn't exist
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS tasks (
+            id   SERIAL PRIMARY KEY,
+            title TEXT NOT NULL,
+            done  BOOLEAN NOT NULL DEFAULT false
+        )
+    `);
 
-// Check if the table is empty
-const rowCount = db.prepare("SELECT COUNT(*) AS count FROM tasks").get();
+    // Seed only if table is empty
+    const { rows } = await pool.query("SELECT COUNT(*) AS count FROM tasks");
 
-// Seed initial data only once
-if (rowCount.count === 0) {
-    const insert = db.prepare(
-        "INSERT INTO tasks (title, done) VALUES (?, ?)"
-    );
+    if (parseInt(rows[0].count) === 0) {
+        await pool.query(`
+            INSERT INTO tasks (title, done) VALUES
+            ('Learn Express',              false),
+            ('Complete FlyRank Assignment', false),
+            ('Push project to GitHub',      true)
+        `);
+        console.log("✅ Sample tasks inserted.");
+    }
 
-    insert.run("Learn Express", 0);
-    insert.run("Complete FlyRank Assignment", 0);
-    insert.run("Push project to GitHub", 1);
-
-    console.log("✅ Sample tasks inserted.");
+    console.log("🐘 Connected to PostgreSQL");
 }
 
-module.exports = db;
+module.exports = { pool, initDb };
