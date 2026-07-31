@@ -1,60 +1,89 @@
 # FlyRank CRUD API
 
-A simple REST API built with Node.js and Express for the FlyRank Backend Internship.
+A RESTful CRUD API built with Node.js, Express, PostgreSQL, and Docker Compose.
+
+## Run the Project
+
+```bash
+git clone https://github.com/nareshchandu17/flyrank-crud-api.git
+cd flyrank-crud-api
+cp .env.example .env
+docker compose up
+```
+
+> Windows users: copy `.env.example` to `.env` manually instead of using `cp`.
+
+That's it. Docker starts both the API and the PostgreSQL database. No manual database setup needed.
+
+## Environment Variables
+
+Copy `.env.example` to `.env`:
+
+```
+DATABASE_URL=postgres://flyrank:flyrank123@db:5432/flyrank_db
+PORT=3000
+```
+
+> When running outside Docker (e.g. `npm run dev`), change the host from `db` to `localhost` and the port to `5433`.
 
 ## Tech Stack
 
 - Node.js
 - Express.js
-- SQLite (via better-sqlite3)
+- PostgreSQL (via pg)
+- Docker + Docker Compose
 - Swagger UI
-- JavaScript
 
-## Features
+## API Endpoints
 
-- Create Task
-- Get All Tasks
-- Get Task by ID
-- Update Task
-- Delete Task
-- Filter Tasks by Done Status
-- Search Tasks by Title
-- Task Statistics
-- Reset Tasks to Initial State
-- Swagger Documentation
+| Method | Endpoint       | Description              |
+|--------|----------------|--------------------------|
+| GET    | /              | API info                 |
+| GET    | /health        | Health check             |
+| GET    | /tasks         | Get all tasks            |
+| GET    | /tasks/:id     | Get one task             |
+| POST   | /tasks         | Create a task            |
+| PUT    | /tasks/:id     | Update a task            |
+| DELETE | /tasks/:id     | Delete a task            |
+| GET    | /tasks/stats   | Task statistics          |
 
-## Installation
+## Example Requests
 
+Get all tasks:
 ```bash
-git clone https://github.com/nareshchandu17/flyrank-crud-api.git
-cd flyrank-crud-api
-npm install
-npm run dev
+curl -i http://localhost:3000/tasks
 ```
 
-The database file `tasks.db` is created automatically on first run. No manual setup required.
+Create a task:
+```bash
+curl -i -X POST http://localhost:3000/tasks \
+  -H "Content-Type: application/json" \
+  -d "{\"title\":\"Learn Docker\"}"
+```
 
-## Why SQLite?
+## Swagger Docs
 
-- Lightweight, file-based database
-- No separate database server required
-- Zero configuration
-- Data persists even after server restarts
-- Perfect for small backend applications and learning SQL
+Visit: http://localhost:3000/docs
+
+![Swagger UI Screenshot](assets/swagger-ui.png)
 
 ## Database
 
-The application uses a SQLite database named `tasks.db`.
+PostgreSQL is managed by Docker Compose. The table is created automatically on first run and seeded with three sample tasks if empty:
 
-The database file is created automatically when the server starts.
+| id | title                      | done  |
+|----|----------------------------|-------|
+| 1  | Learn Express              | false |
+| 2  | Complete FlyRank Assignment| false |
+| 3  | Push project to GitHub     | true  |
 
-If the database is empty, three sample tasks are seeded automatically:
+Data is stored in a Docker volume (`taskdata`) and survives `docker compose down` / `docker compose up` cycles.
 
-| id | title | done |
-|----|-------|------|
-| 1 | Learn Express | 0 |
-| 2 | Complete FlyRank Assignment | 0 |
-| 3 | Push project to GitHub | 1 |
+## Database Screenshot
+
+![PostgreSQL Database](./assets/database.png)
+
+> Screenshot taken from psql / pgAdmin showing the `tasks` table with seeded data.
 
 ## Example SQL Query
 
@@ -62,50 +91,17 @@ If the database is empty, three sample tasks are seeded automatically:
 SELECT * FROM tasks;
 ```
 
-Returns every task stored in the SQLite database.
+Returns every task stored in PostgreSQL.
 
-## Database Screenshot
+---
 
-![SQLite Database](./assets/database.png)
+# Assessment History
 
-> **Note:** Screenshot taken from DB Browser for SQLite showing the `tasks` table with seeded data.
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | / | Root endpoint |
-| GET | /health | Health check |
-| GET | /tasks | Get all tasks (supports ?done=true/false and ?search=query) |
-| GET | /tasks/:id | Get task by ID |
-| POST | /tasks | Create a new task |
-| PUT | /tasks/:id | Update a task |
-| DELETE | /tasks/:id | Delete a task |
-| GET | /tasks/stats | Get task statistics |
-| POST | /tasks/reset | Reset tasks to initial state |
-
-## Swagger
-
-Visit:
-
-http://localhost:3000/docs
-
-![Swagger UI Screenshot](assets/swagger-ui.png)
-
-## Sample curl Command
-
-```bash
-curl -X POST http://localhost:3000/tasks \
--H "Content-Type: application/json" \
--d '{"title":"Buy milk"}'
-```
-
-## Storage
-
-This API uses SQLite via `better-sqlite3` for persistent storage.
-
-All tasks survive server restarts because they are written to `tasks.db` on disk.
-This replaces the in-memory JavaScript array used in Assessment 1.
+| Assessment | Description                        | Status |
+|------------|------------------------------------|--------|
+| 1          | In-memory CRUD API                 | ✅     |
+| 2          | SQLite persistent storage          | ✅     |
+| 3          | PostgreSQL + Docker                | ✅     |
 
 ---
 
@@ -210,19 +206,19 @@ I didn't specify:
 
 ## Comparison Summary
 
-| Aspect | My Implementation | AI Implementation |
-|--------|------------------|-------------------|
-| Initial Data | 3 seed tasks | Empty array |
-| ID Generation | Based on max existing ID | Simple counter |
-| Data Storage | Separate data file | In controller |
-| Filtering | ✅ ?done=true/false | ❌ |
-| Search | ✅ ?search=query | ❌ |
-| Stats Endpoint | ✅ /tasks/stats | ❌ |
-| Reset Endpoint | ✅ /tasks/reset | ❌ |
-| Error Key | `"error"` | `"message"` |
-| Update Validation | Checks for empty update | No check |
-| Swagger Schema | Basic | Includes Task schema |
-| Swagger Path | /docs | /api-docs |
+| Aspect             | My Implementation           | AI Implementation      |
+|--------------------|-----------------------------|------------------------|
+| Initial Data       | 3 seed tasks                | Empty array            |
+| ID Generation      | Based on max existing ID    | Simple counter         |
+| Data Storage       | Separate data file          | In controller          |
+| Filtering          | ✅ ?done=true/false         | ❌                     |
+| Search             | ✅ ?search=query            | ❌                     |
+| Stats Endpoint     | ✅ /tasks/stats             | ❌                     |
+| Reset Endpoint     | ✅ /tasks/reset             | ❌                     |
+| Error Key          | `"error"`                   | `"message"`            |
+| Update Validation  | Checks for empty update     | No check               |
+| Swagger Schema     | Basic                       | Includes Task schema   |
+| Swagger Path       | /docs                       | /api-docs              |
 
 ---
 
