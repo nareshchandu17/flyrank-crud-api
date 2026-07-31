@@ -35,11 +35,11 @@ async function updateTask(id, title, done) {
 
 // Delete a task, return true if deleted, false if not found
 async function deleteTask(id) {
-    const result = await pool.query(
-        "DELETE FROM tasks WHERE id = $1",
+    const { rows } = await pool.query(
+        "DELETE FROM tasks WHERE id = $1 RETURNING *",
         [id]
     );
-    return result.rowCount > 0;
+    return rows.length > 0;
 }
 
 module.exports = {
