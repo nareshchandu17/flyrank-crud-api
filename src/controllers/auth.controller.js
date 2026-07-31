@@ -42,4 +42,10 @@ const login = async (req, res) => {
     });
 };
 
-module.exports = { signup, login };
+const logout = async (req, res) => {
+    // Token already verified by requireAuth middleware
+    await supabase.auth.signOut();
+    res.status(204).send();
+};
+
+module.exports = { signup, login, logout };
