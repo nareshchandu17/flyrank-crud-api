@@ -3,6 +3,8 @@ const swaggerUi = require("swagger-ui-express");
 
 const taskRoutes = require("./routes/task.routes");
 const authRoutes = require("./routes/auth.routes");
+const publicRoutes = require("./routes/public.routes");
+const protectedRoutes = require("./routes/protected.routes");
 const swaggerSpec = require("./swagger/swagger");
 
 const app = express();
@@ -23,8 +25,10 @@ app.get("/health", (req, res) => {
   });
 });
 
-app.use("/tasks", taskRoutes);
-app.use("/auth",  authRoutes);
+app.use("/tasks",     taskRoutes);
+app.use("/auth",      authRoutes);
+app.use("/public",    publicRoutes);
+app.use("/protected", protectedRoutes);
 
 app.use(
     "/docs",
