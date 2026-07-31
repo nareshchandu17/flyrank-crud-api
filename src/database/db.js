@@ -1,13 +1,9 @@
 require("dotenv").config();
 const { Pool } = require("pg");
 
-// Create a connection pool using environment variables
+// Single connection string from .env
 const pool = new Pool({
-    host:     process.env.PGHOST,
-    port:     process.env.PGPORT,
-    user:     process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    database: process.env.PGDATABASE,
+    connectionString: process.env.DATABASE_URL,
 });
 
 // Create table and seed initial data if empty
@@ -15,8 +11,8 @@ async function initDb() {
     // Create the tasks table if it doesn't exist
     await pool.query(`
         CREATE TABLE IF NOT EXISTS tasks (
-            id   SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
+            id    SERIAL PRIMARY KEY,
+            title TEXT    NOT NULL,
             done  BOOLEAN NOT NULL DEFAULT false
         )
     `);
@@ -27,7 +23,7 @@ async function initDb() {
     if (parseInt(rows[0].count) === 0) {
         await pool.query(`
             INSERT INTO tasks (title, done) VALUES
-            ('Learn Express',              false),
+            ('Learn Express',               false),
             ('Complete FlyRank Assignment', false),
             ('Push project to GitHub',      true)
         `);
