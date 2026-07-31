@@ -1,11 +1,12 @@
 const { Router } = require("express");
+const supabase = require("../config/supabase");
 
 const router = Router();
 
-router.get("/profile", (req, res) => {
+router.get("/profile", async (req, res) => {
     const authHeader = req.headers["authorization"];
 
-    // Header must exist and be in the form "Bearer <token>"
+    // Check header exists and is well-formed
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).json({
             error: "Access token required",
@@ -20,11 +21,19 @@ router.get("/profile", (req, res) => {
         });
     }
 
-    // Token was presented — not verified yet, just acknowledged
-    res.status(200).json({
-        message: "Token received (not yet verified).",
-        token,
-    });
+    // Ask Supabase to verify the token — this is a real network call
+    const { data, error } = await supabase.auth.getUser(token);
+
+    if (error || !data.user) {
+        return res.status(401).json({
+            error: "Invalid or expired token",
+        });
+    }
+
+    // Return only safe metadata — never expose sensitive fields
+    const { id, email, created_at } = data.user;
+
+    res.status(200).json({ id, email, created_at });
 });
 
 module.exports = router;
