@@ -56,3 +56,9 @@ At ~430 tokens per call on Gemini Flash pricing, 10,000 requests would cost appr
 
 ## What I'd fix with another day
 With another day, I would improve the system prompt to distinguish better between "development" and "design" for UI tasks, and I'd add a circuit breaker to gracefully degrade all classification to manual when rate limits (like 429s) are repeatedly exhausted.
+
+## Stretch Goals Insights
+**Provider Abstraction:** Putting the LLM behind an interface matters much more than a normal HTTP dependency because LLM providers change rapidly (models deprecate, pricing changes) and frequently suffer from rate limits or downtime. An abstraction allows swapping from OpenAI to Anthropic or a local stub in exactly one file.
+**Eval Failures:** We previously got "Typo in the footer" classified as `design` instead of `bug`. The LLM likely over-indexed on the word "footer" (a UI element) and ignored the word "typo" (a defect).
+**Prompt Injection:** While our expanded 25-case eval suite mostly hit a wall of 429 Rate Limit errors on the free tier, the `<user_input>` XML tag defense is generally strong. However, an attack that simply starts with `</user_input>` can still break out of the delimited block if we don't sanitize the input first.
+**Cost Drivers:** The single biggest driver of cost is **retries on large inputs**. Because the system prompt and user input must be resent on every 429 or 5xx error, a 1,000-token input that retries 3 times effectively costs 4,000 input tokens before a single output token is generated.

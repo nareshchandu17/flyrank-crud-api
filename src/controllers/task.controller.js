@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const OpenAI = require("openai");
+const llmProvider = require("../llm/provider");
 const taskModel = require("../models/task.model");
 const { taskInputSchema, taskOutputSchema } = require("../llm/schema");
 
@@ -21,59 +21,6 @@ function parseAndValidateLlmOutput(text) {
     return result.data;
 }
 
-const client = new OpenAI({
-  baseURL: process.env.LLM_BASE_URL,
-  apiKey: process.env.LLM_API_KEY,
-  timeout: 30000,
-  maxRetries: 0,
-});
-
-async function callLlmWithRetry(params) {
-    const maxAttempts = 4; // Initial + 3 retries (1s, 2s, 4s)
-    const baseDelays = [1000, 2000, 4000];
-
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        try {
-            return await client.chat.completions.create(params);
-        } catch (error) {
-            const status = error.status;
-            
-            // Never retry on client errors 400, 401, 403
-            if (status === 400 || status === 401 || status === 403) {
-                throw error;
-            }
-
-            // Retry on timeout (no status or 408), 429, and 5xx
-            const isTimeout = error instanceof OpenAI.APIConnectionTimeoutError || status === 408;
-            const isRateLimit = status === 429;
-            const isServerError = status >= 500 && status < 600;
-
-            if (!isTimeout && !isRateLimit && !isServerError) {
-                throw error; // Some other error, don't retry
-            }
-
-            if (attempt === maxAttempts - 1) {
-                throw error; // Out of retries
-            }
-
-            let delay = baseDelays[attempt] + Math.random() * 500; // jitter
-
-            if (isRateLimit && error.headers && error.headers['retry-after']) {
-                const retryAfter = error.headers['retry-after'];
-                if (!isNaN(retryAfter)) {
-                    delay = parseInt(retryAfter) * 1000;
-                } else {
-                    const date = new Date(retryAfter);
-                    if (!isNaN(date.getTime())) {
-                        delay = Math.max(0, date.getTime() - Date.now());
-                    }
-                }
-            }
-
-            await new Promise(resolve => setTimeout(resolve, delay));
-        }
-    }
-}
 
 const getAllTasks = async (req, res) => {
     const tasks = await taskModel.getAllTasks();
@@ -206,45 +153,40 @@ const classifyTask = async (req, res) => {
     try {
         const promptPath = path.join(__dirname, "../../prompts/task-classifier-v1.md");
         const systemPrompt = fs.readFileSync(promptPath, "utf-8");
-        const userContent = JSON.stringify(result.data);
+        const rawJsonInput = JSON.stringify(result.data);
+        const userContent = `<user_input>\n${rawJsonInput}\n</user_input>`;
+
+        // Measure before you spend: Heuristic token count
+        const estimatedTokens = Math.ceil((systemPrompt.length + userContent.length) / 4);
+        if (estimatedTokens > 2000) {
+            return res.status(413).json({
+                error: "Payload Too Large",
+                details: `Estimated tokens (${estimatedTokens}) exceeds the limit of 2000.`
+            });
+        }
 
         const startTime = Date.now();
         let inputTokens = 0;
         let outputTokens = 0;
         let neededRepair = false;
 
-        let completion = await callLlmWithRetry({
-            model: process.env.LLM_MODEL,
-            temperature: 0.1,
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: userContent }
-            ],
-        });
-
-        let rawOutput = completion.choices[0].message.content;
-        inputTokens += completion.usage?.prompt_tokens || 0;
-        outputTokens += completion.usage?.completion_tokens || 0;
+        let completion = await llmProvider.complete(systemPrompt, userContent, process.env.LLM_MODEL);
+        let rawOutput = completion.raw_output;
+        inputTokens += completion.input_tokens || 0;
+        outputTokens += completion.output_tokens || 0;
         let finalData;
 
         try {
             finalData = parseAndValidateLlmOutput(rawOutput);
         } catch (parseError) {
             neededRepair = true;
-            completion = await callLlmWithRetry({
-                model: process.env.LLM_MODEL,
-                temperature: 0.1,
-                messages: [
-                    { role: "system", content: systemPrompt },
-                    { role: "user", content: userContent },
-                    { role: "assistant", content: rawOutput },
-                    { role: "user", content: `Your previous answer was rejected for this reason: ${parseError.message}. Return only corrected JSON matching the schema.` }
-                ],
-            });
-
-            rawOutput = completion.choices[0].message.content;
-            inputTokens += completion.usage?.prompt_tokens || 0;
-            outputTokens += completion.usage?.completion_tokens || 0;
+            const repairPrompt = `Your previous answer was rejected for this reason: ${parseError.message}. Return only corrected JSON matching the schema.`;
+            
+            completion = await llmProvider.complete(systemPrompt, userContent, process.env.LLM_MODEL, rawOutput, repairPrompt);
+            
+            rawOutput = completion.raw_output;
+            inputTokens += completion.input_tokens || 0;
+            outputTokens += completion.output_tokens || 0;
             
             try {
                 finalData = parseAndValidateLlmOutput(rawOutput);
@@ -290,7 +232,7 @@ const classifyTask = async (req, res) => {
         res.status(200).json(finalData);
     } catch (error) {
         console.error("LLM Error:", error);
-        if (error instanceof OpenAI.APIConnectionTimeoutError) {
+        if (llmProvider.isTimeoutError(error)) {
             return res.status(504).json({ error: "Gateway Timeout", details: "The AI provider took too long to respond." });
         }
         res.status(500).json({ error: "Failed to classify task" });
