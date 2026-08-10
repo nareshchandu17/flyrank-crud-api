@@ -217,3 +217,29 @@ npm run dev
 ```
 
 Runs on port 3001. Swagger: http://localhost:3001/api-docs
+
+## Testing the LLM Endpoint (Stub Mode)
+
+To test the task classification endpoint without making actual LLM calls, set the `LLM_STUB=1` environment variable and use these `curl` commands.
+
+### Valid Request
+```bash
+curl -X POST http://localhost:3000/tasks/classify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Fix the login bug",
+    "description": "Users cannot log in when using Safari."
+  }'
+```
+*Expected response: `200 OK` with JSON matching the output schema.*
+
+### Invalid Request
+```bash
+curl -X POST http://localhost:3000/tasks/classify \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Too short description",
+    "description": ""
+  }'
+```
+*Expected response: `400 Bad Request` with an error message naming the invalid field (`description`).*

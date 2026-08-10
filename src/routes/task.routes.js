@@ -9,7 +9,8 @@ const {
   updateTask,
   deleteTask,
   getStats,
-  resetTasks
+  resetTasks,
+  classifyTask
 } = require("../controllers/task.controller");
 
 /**
@@ -66,8 +67,40 @@ router.get("/stats", getStats);
  *     responses:
  *       200:
  *         description: Tasks reset successfully
+ *       403:
+ *         description: Feature disabled
  */
 router.post("/reset", resetTasks);
+
+/**
+ * @swagger
+ * /tasks/classify:
+ *   post:
+ *     summary: Classifies a new task and assigns it a category, urgency, and estimated effort
+ *     tags: [Tasks]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 maxLength: 200
+ *               description:
+ *                 type: string
+ *                 maxLength: 2000
+ *             required:
+ *               - title
+ *               - description
+ *     responses:
+ *       200:
+ *         description: Classification successful
+ *       400:
+ *         description: Validation error
+ */
+router.post("/classify", classifyTask);
 
 /**
  * @swagger

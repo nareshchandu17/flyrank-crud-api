@@ -1,4 +1,5 @@
 const taskModel = require("../models/task.model");
+const { taskInputSchema } = require("../llm/schema");
 
 const getAllTasks = async (req, res) => {
     const tasks = await taskModel.getAllTasks();
@@ -101,6 +102,29 @@ const resetTasks = (req, res) => {
     });
 };
 
+const classifyTask = async (req, res) => {
+    const result = taskInputSchema.safeParse(req.body);
+
+    if (!result.success) {
+        const errorMsg = result.error.issues[0];
+        return res.status(400).json({
+            error: `Invalid field: ${errorMsg.path.join('.')}`,
+            details: errorMsg.message
+        });
+    }
+
+    if (process.env.LLM_STUB === "1") {
+        return res.status(200).json({
+            category: "development",
+            urgency: "normal",
+            effort: "medium",
+            confidence: 0.95
+        });
+    }
+
+    res.status(501).json({ error: "Not implemented. Use LLM_STUB=1 to test." });
+};
+
 module.exports = {
     getAllTasks,
     getTaskById,
@@ -109,4 +133,5 @@ module.exports = {
     deleteTask,
     getStats,
     resetTasks,
+    classifyTask,
 };
