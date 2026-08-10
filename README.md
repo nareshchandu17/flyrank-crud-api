@@ -244,7 +244,9 @@ curl -X POST http://localhost:3000/tasks/classify \
 ```
 *Expected response: `400 Bad Request` with an error message naming the invalid field (`description`).*
 
-## LLM Testing (Stage 33)
+## LLM Testing (Stage 33 & 35)
+
+*Retry Policy:* We explicitly implemented our own custom retry logic (disabling the SDK's default by setting `maxRetries: 0`). It handles 429 (respecting `Retry-After`) and 5xx errors (with a 30-second client timeout) using exponential backoff with jitter (1s, 2s, 4s).
 
 I ran the LLM integration on three real inputs, including a typical task, an ambiguous question, and a hostile prompt injection attempt. 
 

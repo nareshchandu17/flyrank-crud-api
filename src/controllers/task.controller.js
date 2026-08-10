@@ -24,7 +24,56 @@ function parseAndValidateLlmOutput(text) {
 const client = new OpenAI({
   baseURL: process.env.LLM_BASE_URL,
   apiKey: process.env.LLM_API_KEY,
+  timeout: 30000,
+  maxRetries: 0,
 });
+
+async function callLlmWithRetry(params) {
+    const maxAttempts = 4; // Initial + 3 retries (1s, 2s, 4s)
+    const baseDelays = [1000, 2000, 4000];
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            return await client.chat.completions.create(params);
+        } catch (error) {
+            const status = error.status;
+            
+            // Never retry on client errors 400, 401, 403
+            if (status === 400 || status === 401 || status === 403) {
+                throw error;
+            }
+
+            // Retry on timeout (no status or 408), 429, and 5xx
+            const isTimeout = error instanceof OpenAI.APIConnectionTimeoutError || status === 408;
+            const isRateLimit = status === 429;
+            const isServerError = status >= 500 && status < 600;
+
+            if (!isTimeout && !isRateLimit && !isServerError) {
+                throw error; // Some other error, don't retry
+            }
+
+            if (attempt === maxAttempts - 1) {
+                throw error; // Out of retries
+            }
+
+            let delay = baseDelays[attempt] + Math.random() * 500; // jitter
+
+            if (isRateLimit && error.headers && error.headers['retry-after']) {
+                const retryAfter = error.headers['retry-after'];
+                if (!isNaN(retryAfter)) {
+                    delay = parseInt(retryAfter) * 1000;
+                } else {
+                    const date = new Date(retryAfter);
+                    if (!isNaN(date.getTime())) {
+                        delay = Math.max(0, date.getTime() - Date.now());
+                    }
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+}
 
 const getAllTasks = async (req, res) => {
     const tasks = await taskModel.getAllTasks();
@@ -138,6 +187,13 @@ const classifyTask = async (req, res) => {
         });
     }
 
+    if (process.env.LLM_ENABLED === "false") {
+        return res.status(503).json({
+            error: "Service Unavailable",
+            details: "AI classification is currently disabled."
+        });
+    }
+
     if (process.env.LLM_STUB === "1") {
         return res.status(200).json({
             category: "development",
@@ -152,7 +208,12 @@ const classifyTask = async (req, res) => {
         const systemPrompt = fs.readFileSync(promptPath, "utf-8");
         const userContent = JSON.stringify(result.data);
 
-        let completion = await client.chat.completions.create({
+        const startTime = Date.now();
+        let inputTokens = 0;
+        let outputTokens = 0;
+        let neededRepair = false;
+
+        let completion = await callLlmWithRetry({
             model: process.env.LLM_MODEL,
             temperature: 0.1,
             messages: [
@@ -162,12 +223,15 @@ const classifyTask = async (req, res) => {
         });
 
         let rawOutput = completion.choices[0].message.content;
+        inputTokens += completion.usage?.prompt_tokens || 0;
+        outputTokens += completion.usage?.completion_tokens || 0;
         let finalData;
 
         try {
             finalData = parseAndValidateLlmOutput(rawOutput);
         } catch (parseError) {
-            completion = await client.chat.completions.create({
+            neededRepair = true;
+            completion = await callLlmWithRetry({
                 model: process.env.LLM_MODEL,
                 temperature: 0.1,
                 messages: [
@@ -179,6 +243,8 @@ const classifyTask = async (req, res) => {
             });
 
             rawOutput = completion.choices[0].message.content;
+            inputTokens += completion.usage?.prompt_tokens || 0;
+            outputTokens += completion.usage?.completion_tokens || 0;
             
             try {
                 finalData = parseAndValidateLlmOutput(rawOutput);
@@ -207,9 +273,26 @@ const classifyTask = async (req, res) => {
             }
         }
 
+        const durationMs = Date.now() - startTime;
+        const usageLog = {
+            timestamp: new Date().toISOString(),
+            prompt_version: "v1",
+            model: process.env.LLM_MODEL,
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            duration_ms: durationMs,
+            needed_repair: neededRepair
+        };
+        const logDir = path.join(__dirname, "../../logs");
+        if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
+        fs.appendFileSync(path.join(logDir, "usage.jsonl"), JSON.stringify(usageLog) + "\n");
+
         res.status(200).json(finalData);
     } catch (error) {
         console.error("LLM Error:", error);
+        if (error instanceof OpenAI.APIConnectionTimeoutError) {
+            return res.status(504).json({ error: "Gateway Timeout", details: "The AI provider took too long to respond." });
+        }
         res.status(500).json({ error: "Failed to classify task" });
     }
 };
