@@ -24,6 +24,11 @@ Copy `.env.example` to `.env` and fill in your Supabase credentials:
 | `SUPABASE_URL`  | Supabase dashboard → Project Settings → API          |
 | `SUPABASE_KEY`  | Supabase dashboard → Project Settings → API (anon key) |
 | `PORT`          | Default 3000                                         |
+| `LLM_BASE_URL`  | The base URL of the LLM provider                     |
+| `LLM_API_KEY`   | API key for your LLM provider                        |
+| `LLM_MODEL`     | The model ID to use (e.g., `gemini-2.5-flash`)       |
+
+> 💡 **Note:** The LLM client is configured entirely via environment variables. This allows switching between providers (like Gemini, OpenRouter, or a local Ollama instance) by changing just three variables, with zero code changes.
 
 > ⚠️ Never commit your real `.env` file. It is listed in `.gitignore`.
 
