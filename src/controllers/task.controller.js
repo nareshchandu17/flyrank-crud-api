@@ -2,7 +2,24 @@ const fs = require("fs");
 const path = require("path");
 const OpenAI = require("openai");
 const taskModel = require("../models/task.model");
-const { taskInputSchema } = require("../llm/schema");
+const { taskInputSchema, taskOutputSchema } = require("../llm/schema");
+
+function parseAndValidateLlmOutput(text) {
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start === -1 || end === -1) {
+        throw new Error("No JSON object found in response");
+    }
+    const jsonStr = text.substring(start, end + 1);
+    const parsed = JSON.parse(jsonStr);
+    
+    const result = taskOutputSchema.safeParse(parsed);
+    if (!result.success) {
+        const errorMsg = result.error.issues[0];
+        throw new Error(`Invalid output field: ${errorMsg.path.join('.')} - ${errorMsg.message}`);
+    }
+    return result.data;
+}
 
 const client = new OpenAI({
   baseURL: process.env.LLM_BASE_URL,
@@ -133,17 +150,64 @@ const classifyTask = async (req, res) => {
     try {
         const promptPath = path.join(__dirname, "../../prompts/task-classifier-v1.md");
         const systemPrompt = fs.readFileSync(promptPath, "utf-8");
+        const userContent = JSON.stringify(result.data);
 
-        const completion = await client.chat.completions.create({
+        let completion = await client.chat.completions.create({
             model: process.env.LLM_MODEL,
             temperature: 0.1,
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: JSON.stringify(result.data) }
+                { role: "user", content: userContent }
             ],
         });
 
-        res.status(200).send(completion.choices[0].message.content);
+        let rawOutput = completion.choices[0].message.content;
+        let finalData;
+
+        try {
+            finalData = parseAndValidateLlmOutput(rawOutput);
+        } catch (parseError) {
+            completion = await client.chat.completions.create({
+                model: process.env.LLM_MODEL,
+                temperature: 0.1,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userContent },
+                    { role: "assistant", content: rawOutput },
+                    { role: "user", content: `Your previous answer was rejected for this reason: ${parseError.message}. Return only corrected JSON matching the schema.` }
+                ],
+            });
+
+            rawOutput = completion.choices[0].message.content;
+            
+            try {
+                finalData = parseAndValidateLlmOutput(rawOutput);
+            } catch (secondError) {
+                const logEntry = {
+                    timestamp: new Date().toISOString(),
+                    prompt_version: "v1",
+                    input: result.data,
+                    raw_output: rawOutput,
+                    error: secondError.message
+                };
+                
+                const logDir = path.join(__dirname, "../../logs");
+                if (!fs.existsSync(logDir)) {
+                    fs.mkdirSync(logDir);
+                }
+                fs.appendFileSync(
+                    path.join(logDir, "quarantine.jsonl"), 
+                    JSON.stringify(logEntry) + "\n"
+                );
+
+                return res.status(422).json({
+                    error: "Unprocessable Entity",
+                    details: "Failed to generate valid classification from the model after repair attempt."
+                });
+            }
+        }
+
+        res.status(200).json(finalData);
     } catch (error) {
         console.error("LLM Error:", error);
         res.status(500).json({ error: "Failed to classify task" });
