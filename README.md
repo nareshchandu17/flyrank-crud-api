@@ -243,3 +243,13 @@ curl -X POST http://localhost:3000/tasks/classify \
   }'
 ```
 *Expected response: `400 Bad Request` with an error message naming the invalid field (`description`).*
+
+## LLM Testing (Stage 33)
+
+I ran the LLM integration on three real inputs, including a typical task, an ambiguous question, and a hostile prompt injection attempt. 
+
+**What surprised me:**
+1. The model handled the hostile prompt perfectly. When told to ignore instructions and write a poem, it returned the exact JSON schema with category `"other"` and a low confidence score (`0.20`), refusing to break the JSON structure!
+2. Even though I asked it to output *exactly* a JSON object, the model consistently wrapped the response in Markdown code blocks (e.g. ` ```json\n { ... } \n``` `). The shape inside the block is perfect every time, but parsing it will require stripping those backticks in the future.
+3. Keeping the user content separate from the system prompt by encoding it as a JSON string `{"role": "user", "content": "..."}` was highly effective at neutralizing the prompt injection.
+

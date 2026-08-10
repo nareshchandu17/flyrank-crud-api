@@ -1,5 +1,13 @@
+const fs = require("fs");
+const path = require("path");
+const OpenAI = require("openai");
 const taskModel = require("../models/task.model");
 const { taskInputSchema } = require("../llm/schema");
+
+const client = new OpenAI({
+  baseURL: process.env.LLM_BASE_URL,
+  apiKey: process.env.LLM_API_KEY,
+});
 
 const getAllTasks = async (req, res) => {
     const tasks = await taskModel.getAllTasks();
@@ -122,7 +130,24 @@ const classifyTask = async (req, res) => {
         });
     }
 
-    res.status(501).json({ error: "Not implemented. Use LLM_STUB=1 to test." });
+    try {
+        const promptPath = path.join(__dirname, "../../prompts/task-classifier-v1.md");
+        const systemPrompt = fs.readFileSync(promptPath, "utf-8");
+
+        const completion = await client.chat.completions.create({
+            model: process.env.LLM_MODEL,
+            temperature: 0.1,
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: JSON.stringify(result.data) }
+            ],
+        });
+
+        res.status(200).send(completion.choices[0].message.content);
+    } catch (error) {
+        console.error("LLM Error:", error);
+        res.status(500).json({ error: "Failed to classify task" });
+    }
 };
 
 module.exports = {
