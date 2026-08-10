@@ -1,0 +1,34 @@
+[
+  {
+    "input": { "title": "Update logo on homepage", "description": "Please swap out the old PNG for the new SVG logo provided by the brand team." },
+    "expected": { "category": "design" }
+  },
+  {
+    "input": { "title": "The app is broken!!!", "description": "I can't log in at all, it just gives me a white screen." },
+    "expected": { "category": "bug" }
+  },
+  {
+    "input": { "title": "Write SQL migration for user settings", "description": "Add the new dark_mode column to the users table." },
+    "expected": { "category": "development" }
+  },
+  {
+    "input": { "title": "Draft email campaign for Black Friday", "description": "Needs to be sent to all active users with a 20% discount code." },
+    "expected": { "category": "marketing" }
+  },
+  {
+    "input": { "title": "Implement new caching layer", "description": "Use Redis to cache the /api/tasks endpoint." },
+    "expected": { "category": "development" }
+  },
+  {
+    "input": { "title": "asdf", "description": "asdfasdf" },
+    "expected": { "category": "other" }
+  },
+  {
+    "input": { "title": "Make me a coffee", "description": "I like it black with two sugars." },
+    "expected": { "category": "other" }
+  },
+  {
+    "input": { "title": "Investigate lower conversion rates", "description": "Our signups dropped 10% this week. Is it a technical issue or marketing?" },
+    "expected": { "category": "other" }
+  }
+]
