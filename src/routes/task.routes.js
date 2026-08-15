@@ -10,7 +10,8 @@ const {
   deleteTask,
   getStats,
   resetTasks,
-  classifyTask
+  classifyTask,
+  getClassificationStatus
 } = require("../controllers/task.controller");
 
 /**
@@ -76,7 +77,7 @@ router.post("/reset", resetTasks);
  * @swagger
  * /tasks/classify:
  *   post:
- *     summary: Classifies a new task and assigns it a category, urgency, and estimated effort
+ *     summary: Enqueues a new task for classification
  *     tags: [Tasks]
  *     requestBody:
  *       required: true
@@ -95,8 +96,8 @@ router.post("/reset", resetTasks);
  *               - title
  *               - description
  *     responses:
- *       200:
- *         description: Classification successful
+ *       202:
+ *         description: Classification job accepted
  *       400:
  *         description: Validation error
  */
@@ -104,8 +105,29 @@ router.post("/classify", classifyTask);
 
 /**
  * @swagger
+ * /tasks/classify/{jobId}:
+ *   get:
+ *     summary: Get classification job status
+ *     tags: [Tasks]
+ *     parameters:
+ *       - in: path
+ *         name: jobId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Job status returned
+ *       404:
+ *         description: Job not found
+ */
+router.get("/classify/:jobId", getClassificationStatus);
+
+/**
+ * @swagger
  * /tasks/{id}:
  *   get:
+
  *     summary: Get task by ID
  *     tags: [Tasks]
  *     parameters:

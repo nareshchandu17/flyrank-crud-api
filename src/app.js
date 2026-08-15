@@ -7,6 +7,9 @@ const publicRoutes = require("./routes/public.routes");
 const protectedRoutes = require("./routes/protected.routes");
 const swaggerSpec = require("./swagger/swagger");
 
+// Start the background worker
+require("./jobs/worker");
+
 const app = express();
 
 app.use(express.json());

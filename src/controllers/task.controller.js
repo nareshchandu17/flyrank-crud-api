@@ -1,25 +1,12 @@
 const fs = require("fs");
 const path = require("path");
-const llmProvider = require("../llm/provider");
 const taskModel = require("../models/task.model");
-const { taskInputSchema, taskOutputSchema } = require("../llm/schema");
+const { taskInputSchema } = require("../llm/schema");
+const { classificationQueue } = require("../jobs/queue");
+const { pool } = require("../database/db");
+const crypto = require("crypto");
 
-function parseAndValidateLlmOutput(text) {
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start === -1 || end === -1) {
-        throw new Error("No JSON object found in response");
-    }
-    const jsonStr = text.substring(start, end + 1);
-    const parsed = JSON.parse(jsonStr);
-    
-    const result = taskOutputSchema.safeParse(parsed);
-    if (!result.success) {
-        const errorMsg = result.error.issues[0];
-        throw new Error(`Invalid output field: ${errorMsg.path.join('.')} - ${errorMsg.message}`);
-    }
-    return result.data;
-}
+
 
 
 const getAllTasks = async (req, res) => {
@@ -150,92 +137,75 @@ const classifyTask = async (req, res) => {
         });
     }
 
+    const promptPath = path.join(__dirname, "../../prompts/task-classifier-v1.md");
+    const systemPrompt = fs.readFileSync(promptPath, "utf-8");
+    const rawJsonInput = JSON.stringify(result.data);
+    const userContent = `<user_input>\n${rawJsonInput}\n</user_input>`;
+
+    // Measure before you spend: Heuristic token count
+    const estimatedTokens = Math.ceil((systemPrompt.length + userContent.length) / 4);
+    if (estimatedTokens > 2000) {
+        return res.status(413).json({
+            error: "Payload Too Large",
+            details: `Estimated tokens (${estimatedTokens}) exceeds the limit of 2000.`
+        });
+    }
+
+    // Generate idempotency/job ID based on hash of the input
+    const jobId = crypto.createHash('sha256').update(rawJsonInput).digest('hex');
+
     try {
-        const promptPath = path.join(__dirname, "../../prompts/task-classifier-v1.md");
-        const systemPrompt = fs.readFileSync(promptPath, "utf-8");
-        const rawJsonInput = JSON.stringify(result.data);
-        const userContent = `<user_input>\n${rawJsonInput}\n</user_input>`;
+        // Initial insert into db as pending (idempotent due to ON CONFLICT)
+        await pool.query(
+            `INSERT INTO job_results (job_id, status) VALUES ($1, $2)
+             ON CONFLICT (job_id) DO NOTHING`,
+            [jobId, 'pending']
+        );
 
-        // Measure before you spend: Heuristic token count
-        const estimatedTokens = Math.ceil((systemPrompt.length + userContent.length) / 4);
-        if (estimatedTokens > 2000) {
-            return res.status(413).json({
-                error: "Payload Too Large",
-                details: `Estimated tokens (${estimatedTokens}) exceeds the limit of 2000.`
-            });
-        }
-
-        const startTime = Date.now();
-        let inputTokens = 0;
-        let outputTokens = 0;
-        let neededRepair = false;
-
-        let completion = await llmProvider.complete(systemPrompt, userContent, process.env.LLM_MODEL);
-        let rawOutput = completion.raw_output;
-        inputTokens += completion.input_tokens || 0;
-        outputTokens += completion.output_tokens || 0;
-        let finalData;
-
-        try {
-            finalData = parseAndValidateLlmOutput(rawOutput);
-        } catch (parseError) {
-            neededRepair = true;
-            const repairPrompt = `Your previous answer was rejected for this reason: ${parseError.message}. Return only corrected JSON matching the schema.`;
-            
-            completion = await llmProvider.complete(systemPrompt, userContent, process.env.LLM_MODEL, rawOutput, repairPrompt);
-            
-            rawOutput = completion.raw_output;
-            inputTokens += completion.input_tokens || 0;
-            outputTokens += completion.output_tokens || 0;
-            
-            try {
-                finalData = parseAndValidateLlmOutput(rawOutput);
-            } catch (secondError) {
-                const logEntry = {
-                    timestamp: new Date().toISOString(),
-                    prompt_version: "v1",
-                    input: result.data,
-                    raw_output: rawOutput,
-                    error: secondError.message
-                };
-                
-                const logDir = path.join(__dirname, "../../logs");
-                if (!fs.existsSync(logDir)) {
-                    fs.mkdirSync(logDir);
-                }
-                fs.appendFileSync(
-                    path.join(logDir, "quarantine.jsonl"), 
-                    JSON.stringify(logEntry) + "\n"
-                );
-
-                return res.status(422).json({
-                    error: "Unprocessable Entity",
-                    details: "Failed to generate valid classification from the model after repair attempt."
-                });
+        // Add to queue with 3 retries, exponential backoff
+        await classificationQueue.add("classify", { inputData: result.data }, {
+            jobId: jobId,
+            attempts: 4, // initial + 3 retries
+            backoff: {
+                type: 'exponential',
+                delay: 1000,
             }
-        }
+        });
 
-        const durationMs = Date.now() - startTime;
-        const usageLog = {
-            timestamp: new Date().toISOString(),
-            prompt_version: "v1",
-            model: process.env.LLM_MODEL,
-            input_tokens: inputTokens,
-            output_tokens: outputTokens,
-            duration_ms: durationMs,
-            needed_repair: neededRepair
-        };
-        const logDir = path.join(__dirname, "../../logs");
-        if (!fs.existsSync(logDir)) fs.mkdirSync(logDir);
-        fs.appendFileSync(path.join(logDir, "usage.jsonl"), JSON.stringify(usageLog) + "\n");
+        // Accept fast, return 202
+        return res.status(202).json({
+            message: "Classification job accepted.",
+            jobId: jobId,
+            statusUrl: `/tasks/classify/${jobId}`
+        });
 
-        res.status(200).json(finalData);
     } catch (error) {
-        console.error("LLM Error:", error);
-        if (llmProvider.isTimeoutError(error)) {
-            return res.status(504).json({ error: "Gateway Timeout", details: "The AI provider took too long to respond." });
+        console.error("Queue Error:", error);
+        res.status(500).json({ error: "Failed to enqueue task classification" });
+    }
+};
+
+const getClassificationStatus = async (req, res) => {
+    const { jobId } = req.params;
+
+    try {
+        const { rows } = await pool.query(`SELECT * FROM job_results WHERE job_id = $1`, [jobId]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: "Job not found" });
         }
-        res.status(500).json({ error: "Failed to classify task" });
+
+        const job = rows[0];
+        res.status(200).json({
+            jobId: job.job_id,
+            status: job.status,
+            result: job.result_data,
+            created_at: job.created_at,
+            updated_at: job.updated_at
+        });
+    } catch (error) {
+        console.error("Status Error:", error);
+        res.status(500).json({ error: "Failed to fetch job status" });
     }
 };
 
@@ -248,4 +218,5 @@ module.exports = {
     getStats,
     resetTasks,
     classifyTask,
+    getClassificationStatus,
 };
