@@ -4,12 +4,17 @@ services:
     container_name: flyrank_api
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgres://flyrank:flyrank123@db:5432/flyrank_db
+      REDIS_URL: redis://redis:6379
       PORT: 3000
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
 
   db:
@@ -28,6 +33,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: flyrank_redis
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 
 volumes:
