@@ -13,13 +13,33 @@ curl -X POST http://localhost:3000/tasks/classify \
   }'
 ```
 
-**Response:**
+**Response (Instant):**
 ```json
 {
-  "category": "bug",
-  "urgency": "high",
-  "effort": "medium",
-  "confidence": 0.85
+  "message": "Classification job accepted.",
+  "jobId": "a1b2c3d4e5f6...",
+  "statusUrl": "/tasks/classify/a1b2c3d4e5f6..."
+}
+```
+
+## Get Job Status
+```bash
+curl http://localhost:3000/tasks/classify/a1b2c3d4e5f6...
+```
+
+**Response (When complete):**
+```json
+{
+  "jobId": "a1b2c3d4e5f6...",
+  "status": "completed",
+  "result": {
+    "category": "bug",
+    "urgency": "high",
+    "effort": "medium",
+    "confidence": 0.85
+  },
+  "created_at": "2026-08-15T10:00:00Z",
+  "updated_at": "2026-08-15T10:00:03Z"
 }
 ```
 
